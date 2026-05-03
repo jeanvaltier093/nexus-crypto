@@ -677,7 +677,7 @@ app.get('/api/stats', async (_, res) => {
 // ================================================================
 // CRON — 08:00 Paris time every day
 // ================================================================
-cron.schedule('0 8 * * *', () => {
+cron.schedule('5 */4 * * *', () => {
   console.log('⏰ Cron triggered — daily scan');
   runScan().catch(e => console.error('Cron scan error:', e.message));
 }, { scheduled: true, timezone: 'Europe/Paris' });
