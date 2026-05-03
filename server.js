@@ -511,7 +511,7 @@ async function runScan() {
 
       if (!buyOk && !sellOk) console.log(`     ○  No signal`);
 
-      await sleep(500); // buffer between API calls
+      await sleep(13000); // ~13s entre chaque paire → 5 paires en 52s, jamais > 8 req/min
     } catch (e) {
       console.error(`     ❌ ${crypto}: ${e.message}`);
       errors.push({ crypto, error: e.message });
