@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>NEXUS CRYPTO</title>
+  <style>
+    :root {
+      --bg:        #0a0f1e;
+      --surface:   #111827;
+      --surface2:  #1e293b;
+      --border:    #1f2937;
+      --text:      #f1f5f9;
+      --muted:     #64748b;
+      --green:     #22c55e;
+      --green-dim: #166534;
+      --red:       #ef4444;
+      --red-dim:   #7f1d1d;
+      --blue:      #3b82f6;
+      --yellow:    #f59e0b;
+      --r:         12px;
+      --r-sm:      8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+      padding-bottom: 72px;
+    }
+
+    /* ── HEADER ── */
+    .hdr {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .hdr-logo { font-size: 15px; font-weight: 800; letter-spacing: .08em; }
+    .hdr-logo span { color: var(--blue); }
+    .hdr-right { display: flex; align-items: center; gap: 10px; }
+    .last-scan { font-size: 11px; color: var(--muted); }
+
+    .btn-scan {
+      background: var(--blue); color: #fff;
+      border: none; border-radius: var(--r-sm);
+      padding: 6px 14px; font-size: 12px; font-weight: 700;
+      cursor: pointer; letter-spacing: .03em;
+    }
+    .btn-scan:disabled { opacity: .45; cursor: not-allowed; }
+
+    /* ── BOTTOM NAV ── */
+    .nav {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+    }
+    .nav-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      padding: 9px 4px 10px; cursor: pointer;
+      color: var(--muted); font-size: 10px; gap: 3px;
+      border: none; background: none; transition: color .15s;
+    }
+    .nav-btn.active { color: var(--blue); }
+    .nav-icon { font-size: 19px; line-height: 1; }
+
+    /* badge on nav */
+    .nav-badge {
+      position: absolute; top: 6px;
+      background: var(--red); color: #fff;
+      border-radius: 8px; font-size: 9px; font-weight: 700;
+      padding: 1px 5px; min-width: 16px; text-align: center;
+    }
+    .nav-btn { position: relative; }
+
+    /* ── CONTENT ── */
+    .content { padding: 14px 14px; max-width: 600px; margin: 0 auto; }
+    .tab { display: none; }
+    .tab.active { display: block; }
+
+    /* ── SECTION LABEL ── */
+    .sec-label {
+      font-size: 11px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .08em;
+      margin-bottom: 10px; margin-top: 4px;
+    }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .card-hdr {
+      padding: 13px 15px 11px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-body { padding: 13px 15px; }
+
+    /* ── BADGES ── */
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 3px 9px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; letter-spacing: .04em;
+    }
+    .b-buy  { background: rgba(34,197,94,.15);  color: var(--green); }
+    .b-sell { background: rgba(239,68,68,.15);  color: var(--red); }
+    .b-win  { background: rgba(34,197,94,.15);  color: var(--green); }
+    .b-loss { background: rgba(239,68,68,.15);  color: var(--red); }
+    .b-pend { background: rgba(59,130,246,.15); color: var(--blue); }
+    .b-take { background: rgba(100,116,139,.15);color: var(--muted); }
+
+    /* ── PRICE GRID ── */
+    .pg { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 11px 0; }
+    .pi { text-align: center; }
+    .pi-lbl { font-size: 10px; color: var(--muted); margin-bottom: 3px;
+               text-transform: uppercase; letter-spacing: .05em; }
+    .pi-val { font-size: 13px; font-weight: 600; }
+    .pi-val.e { color: var(--text); }
+    .pi-val.s { color: var(--red); }
+    .pi-val.t { color: var(--green); }
+
+    /* ── SIGNAL TAGS ── */
+    .sig-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+    .sig-tag {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 4px; padding: 2px 7px;
+      font-size: 10px; color: var(--muted);
+      font-family: 'Courier New', monospace;
+    }
+
+    /* ── BACKTEST ROW ── */
+    .bt-row { display: flex; gap: 14px; font-size: 11px; color: var(--muted); }
+    .bt-val { color: var(--green); font-weight: 700; }
+
+    /* ── BUTTONS ── */
+    .btn {
+      border-radius: var(--r-sm); font-size: 13px; font-weight: 700;
+      padding: 10px 16px; cursor: pointer; border: none;
+      width: 100%; margin-top: 10px;
+    }
+    .btn-primary { background: var(--blue);  color: #fff; }
+    .btn-success { background: var(--green); color: #fff; }
+    .btn-danger  { background: var(--red);   color: #fff; }
+    .btn-ghost   { background: var(--surface2); color: var(--text); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── EMPTY ── */
+    .empty { text-align: center; padding: 52px 16px; color: var(--muted); }
+    .empty-ico  { font-size: 38px; margin-bottom: 12px; }
+    .empty-ttl  { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .empty-sub  { font-size: 13px; line-height: 1.5; }
+
+    /* ── ACTIVE TRADE CARD ── */
+    .trade-meta { font-size: 12px; color: var(--muted); }
+    .trade-meta strong { color: var(--text); }
+    .btn-row { display: flex; gap: 8px; margin-top: 12px; }
+    .btn-row .btn { margin-top: 0; }
+
+    /* ── HISTORY TABLE ── */
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th {
+      text-align: left; padding: 8px 10px;
+      color: var(--muted); font-weight: 700; font-size: 10px;
+      text-transform: uppercase; letter-spacing: .05em;
+      border-bottom: 1px solid var(--border);
+    }
+    td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    .pnl-pos { color: var(--green); font-weight: 700; }
+    .pnl-neg { color: var(--red);   font-weight: 700; }
+
+    /* ── STATS ── */
+    .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .metric-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 14px;
+    }
+    .m-lbl { font-size: 10px; color: var(--muted); margin-bottom: 4px;
+               text-transform: uppercase; letter-spacing: .05em; }
+    .m-val { font-size: 26px; font-weight: 800; }
+    .m-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+    .streak-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 14px;
+      display: flex; align-items: center; gap: 14px; margin-bottom: 14px;
+    }
+    .streak-ico { font-size: 26px; }
+    .streak-lbl { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+    .streak-val { font-size: 18px; font-weight: 800; }
+
+    .prog-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+    .prog-fill { height: 100%; border-radius: 2px; }
+
+    .dir-row { margin-bottom: 14px; }
+    .dir-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+
+    .crypto-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .crypto-row:last-child { border-bottom: none; }
+    .cr-name { width: 48px; font-weight: 700; font-size: 12px; }
+    .cr-bar  { flex: 1; }
+    .cr-wr   { width: 38px; text-align: right; font-size: 12px; font-weight: 700; }
+    .cr-cnt  { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    /* backtest reference table */
+    .bt-table th, .bt-table td { font-size: 12px; }
+
+    /* ── ALERT ── */
+    .alert { padding: 10px 14px; border-radius: var(--r-sm); font-size: 13px; margin-bottom: 12px; }
+    .alert-ok  { background: rgba(34,197,94,.1); color: var(--green); border: 1px solid var(--green-dim); }
+    .alert-err { background: rgba(239,68,68,.1); color: var(--red);   border: 1px solid var(--red-dim); }
+    .alert-inf { background: rgba(59,130,246,.1);color: var(--blue);  border: 1px solid rgba(59,130,246,.3); }
+
+    /* ── SPINNER ── */
+    .spinner {
+      display: inline-block; width: 18px; height: 18px;
+      border: 2px solid var(--border); border-top-color: var(--blue);
+      border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── MODAL ── */
+    .overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.75); z-index: 200; align-items: flex-end;
+    }
+    .overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border-radius: var(--r) var(--r) 0 0;
+      border-top: 1px solid var(--border);
+      width: 100%; max-width: 600px; margin: 0 auto;
+      padding: 20px 16px 28px;
+      max-height: 85vh; overflow-y: auto;
+    }
+    .modal-ttl { font-size: 16px; font-weight: 800; margin-bottom: 16px; }
+    .form-grp  { margin-bottom: 14px; }
+    .form-lbl  { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: block; }
+    .form-inp  {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--r-sm); color: var(--text);
+      padding: 10px 12px; font-size: 14px;
+    }
+    .form-inp:focus { outline: 2px solid var(--blue); border-color: transparent; }
+
+    /* ── CRYPTO HEADER ── */
+    .crypto-name { font-size: 15px; font-weight: 800; }
+    .crypto-pair { font-size: 11px; color: var(--muted); }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════
+     HEADER
+════════════════════════════════════════ -->
+<header class="hdr">
+  <div class="hdr-logo">NEXUS <span>CRYPTO</span></div>
+  <div class="hdr-right">
+    <span class="last-scan" id="last-scan">—</span>
+    <button class="btn-scan" id="btn-scan" onclick="manualScan()">Scan</button>
+  </div>
+</header>
+
+<!-- ════════════════════════════════════════
+     CONTENT
+════════════════════════════════════════ -->
+<div class="content">
+  <div id="alert-box"></div>
+
+  <!-- SIGNAUX -->
+  <div class="tab active" id="tab-signals">
+    <div id="signals-wrap">
+      <div class="empty"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- TRADES ACTIFS -->
+  <div class="tab" id="tab-trades">
+    <div id="trades-wrap">
+      <div class="empty"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- HISTORIQUE -->
+  <div class="tab" id="tab-history">
+    <div id="history-wrap">
+      <div class="empty"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="tab" id="tab-stats">
+    <div id="stats-wrap">
+      <div class="empty"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     BOTTOM NAV
+════════════════════════════════════════ -->
+<nav class="nav">
+  <button class="nav-btn active" id="nav-signals" onclick="switchTab('signals')">
+    <span class="nav-icon">📡</span><span>Signaux</span>
+  </button>
+  <button class="nav-btn" id="nav-trades" onclick="switchTab('trades')">
+    <span class="nav-icon">⚡</span><span>Actifs</span>
+    <span class="nav-badge" id="badge-trades" style="display:none"></span>
+  </button>
+  <button class="nav-btn" id="nav-history" onclick="switchTab('history')">
+    <span class="nav-icon">📋</span><span>Historique</span>
+  </button>
+  <button class="nav-btn" id="nav-stats" onclick="switchTab('stats')">
+    <span class="nav-icon">📊</span><span>Stats</span>
+  </button>
+</nav>
+
+<!-- ════════════════════════════════════════
+     MODAL — TAKE SIGNAL
+════════════════════════════════════════ -->
+<div class="overlay" id="ov-signal" onclick="closeSignalModal(event)">
+  <div class="modal">
+    <div class="modal-ttl" id="modal-sig-ttl">Confirmer le trade</div>
+    <div id="modal-sig-body"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     MODAL — CLOSE TRADE
+════════════════════════════════════════ -->
+<div class="overlay" id="ov-trade" onclick="closeTradeModal(event)">
+  <div class="modal">
+    <div class="modal-ttl" id="modal-trd-ttl">Clôturer le trade</div>
+    <div id="modal-trd-body"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     SCRIPT
+════════════════════════════════════════ -->
+<script>
+// ================================================================
+// ⚙️ CONFIG — Remplace par l'URL de ton serveur Render
+// ================================================================
+const API_BASE = 'https://YOUR-APP-NAME.onrender.com';
+
+// ================================================================
+// STATE
+// ================================================================
+const state = {
+  signals:  [],
+  trades:   [],
+  stats:    null,
+  lastScan: null,
+  tab:      'signals'
+};
+
+// Map ID → signal object (évite l'escaping JSON dans les onclick)
+window._sMap = {};
+
+// ================================================================
+// INIT
+// ================================================================
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadAll();
+  setInterval(loadAll, 60000); // refresh auto toutes les 60s
+});
+
+// ================================================================
+// DATA
+// ================================================================
+async function loadAll() {
+  await Promise.allSettled([loadSignals(), loadTrades(), loadStats()]);
+  render();
+}
+
+async function loadSignals() {
+  try {
+    const r = await fetch(`${API_BASE}/api/signals`);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    state.signals  = d.signals  || [];
+    state.lastScan = d.lastScan || null;
+    updateHeader();
+  } catch (e) { console.error('loadSignals:', e.message); }
+}
+
+async function loadTrades() {
+  try {
+    const r = await fetch(`${API_BASE}/api/trades`);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    state.trades = d.trades || [];
+  } catch (e) { console.error('loadTrades:', e.message); }
+}
+
+async function loadStats() {
+  try {
+    const r = await fetch(`${API_BASE}/api/stats`);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    state.stats = await r.json();
+  } catch (e) { console.error('loadStats:', e.message); }
+}
+
+// ================================================================
+// SCAN MANUEL
+// ================================================================
+async function manualScan() {
+  const btn = document.getElementById('btn-scan');
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const r = await fetch(`${API_BASE}/api/scan`);
+    const d = await r.json();
+    if (d.success) {
+      showAlert(`Scan terminé — ${d.signals?.length ?? 0} signal(s)`, 'ok');
+      await loadAll();
+    } else {
+      showAlert('Erreur lors du scan', 'err');
+    }
+  } catch { showAlert('Serveur inaccessible', 'err'); }
+  finally { btn.disabled = false; btn.textContent = 'Scan'; }
+}
+
+// ================================================================
+// RENDER
+// ================================================================
+function render() {
+  buildSignalMap();
+  renderSignals();
+  renderTrades();
+  renderHistory();
+  renderStats();
+  updateBadges();
+}
+
+function buildSignalMap() {
+  window._sMap = {};
+  state.signals.forEach(s => { window._sMap[s.id] = s; });
+}
+
+// ── SIGNAUX ──────────────────────────────────────────────────────
+function renderSignals() {
+  const el      = document.getElementById('signals-wrap');
+  const pending = state.signals.filter(s => s.status === 'pending');
+  const taken   = state.signals.filter(s => s.status === 'taken');
+
+  if (!state.signals.length) {
+    el.innerHTML = `
+      <div class="empty">
+        <div class="empty-ico">📡</div>
+        <div class="empty-ttl">Aucun signal aujourd'hui</div>
+        <div class="empty-sub">Scan quotidien à 08h00 Paris.<br>Lance un scan manuel si besoin.</div>
+      </div>`;
+    return;
+  }
+
+  let html = '';
+
+  if (pending.length) {
+    html += `<div class="sec-label">Signaux disponibles (${pending.length})</div>`;
+    pending.forEach(s => { html += signalCard(s); });
+  }
+
+  if (taken.length) {
+    if (pending.length) html += `<div style="height:8px"></div>`;
+    html += `<div class="sec-label">Signaux pris (${taken.length})</div>`;
+    taken.forEach(s => { html += signalCard(s); });
+  }
+
+  el.innerHTML = html;
+}
+
+function signalCard(s) {
+  const isBuy  = s.direction === 'BUY';
+  const taken  = s.status === 'taken';
+  const bt     = isBuy
+    ? { wr: 63, wfMoy: 69, pf: 2.78 }
+    : { wr: 62, wfMoy: 69, pf: 2.72 };
+
+  const symBase = s.crypto.split('/')[0];
+  const symQuot = s.crypto.split('/')[1];
+
+  const dirBadge  = `<span class="badge ${isBuy ? 'b-buy' : 'b-sell'}">${s.direction}</span>`;
+  const statusBdg = taken ? `<span class="badge b-take" style="margin-left:6px">Pris</span>` : '';
+
+  const tags = (s.signals || []).map(t => `<span class="sig-tag">${t}</span>`).join('');
+
+  const cta = taken
+    ? `<button class="btn btn-ghost" disabled>✓ Trade enregistré</button>`
+    : `<button class="btn btn-primary" onclick="openSignalModal('${s.id}')">→ Prendre ce trade</button>`;
+
+  return `
+<div class="card">
+  <div class="card-hdr">
+    <div>
+      <span class="crypto-name">${symBase}</span>
+      <span class="crypto-pair">/${symQuot}</span>
+    </div>
+    <div>${dirBadge}${statusBdg}</div>
+  </div>
+  <div class="card-body">
+    <div class="pg">
+      <div class="pi"><div class="pi-lbl">Entrée</div><div class="pi-val e">${fmtP(s.price, s.crypto)}</div></div>
+      <div class="pi"><div class="pi-lbl">Stop Loss</div><div class="pi-val s">${fmtP(s.sl, s.crypto)}</div></div>
+      <div class="pi"><div class="pi-lbl">Take Profit</div><div class="pi-val t">${fmtP(s.tp, s.crypto)}</div></div>
+    </div>
+    <div class="sig-tags">${tags}</div>
+    <div class="bt-row">
+      <span>WR <span class="bt-val">${bt.wr}%</span></span>
+      <span>WF-moy <span class="bt-val">${bt.wfMoy}%</span></span>
+      <span>PF <span class="bt-val">${bt.pf}</span></span>
+    </div>
+    ${cta}
+  </div>
+</div>`;
+}
+
+// ── TRADES ACTIFS ────────────────────────────────────────────────
+function renderTrades() {
+  const el     = document.getElementById('trades-wrap');
+  const active = state.trades.filter(t => t.result === null);
+
+  if (!active.length) {
+    el.innerHTML = `
+      <div class="empty">
+        <div class="empty-ico">⚡</div>
+        <div class="empty-ttl">Aucun trade actif</div>
+        <div class="empty-sub">Prends un signal depuis l'onglet Signaux.</div>
+      </div>`;
+    return;
+  }
+
+  let html = `<div class="sec-label">${active.length} trade(s) ouvert(s)</div>`;
+
+  active.forEach(t => {
+    const isBuy   = t.direction === 'BUY';
+    const symBase = t.crypto.split('/')[0];
+    const elapsed = elapsedStr(t.entryDate);
+
+    // Distance % to SL and TP from entry
+    const slDist = isBuy
+      ? ((t.entryPrice - t.sl) / t.entryPrice * 100).toFixed(1)
+      : ((t.sl - t.entryPrice) / t.entryPrice * 100).toFixed(1);
+    const tpDist = isBuy
+      ? ((t.tp - t.entryPrice) / t.entryPrice * 100).toFixed(1)
+      : ((t.entryPrice - t.tp) / t.entryPrice * 100).toFixed(1);
+
+    html += `
+<div class="card">
+  <div class="card-hdr">
+    <div>
+      <span class="crypto-name">${symBase}</span>
+      <span class="crypto-pair">/${t.crypto.split('/')[1]}</span>
+    </div>
+    <span class="badge ${isBuy ? 'b-buy' : 'b-sell'}">${t.direction}</span>
+  </div>
+  <div class="card-body">
+    <div class="pg">
+      <div class="pi"><div class="pi-lbl">Entrée</div><div class="pi-val e">${fmtP(t.entryPrice, t.crypto)}</div></div>
+      <div class="pi"><div class="pi-lbl">SL −${slDist}%</div><div class="pi-val s">${fmtP(t.sl, t.crypto)}</div></div>
+      <div class="pi"><div class="pi-lbl">TP +${tpDist}%</div><div class="pi-val t">${fmtP(t.tp, t.crypto)}</div></div>
+    </div>
+    <div class="trade-meta">
+      Ouvert le <strong>${fmtDate(t.entryDate)}</strong> · <strong>${elapsed}</strong>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-success" onclick="openTradeModal('${t.id}','WIN',${t.tp},'${t.crypto}')">✓ WIN</button>
+      <button class="btn btn-danger"  onclick="openTradeModal('${t.id}','LOSS',${t.sl},'${t.crypto}')">✗ LOSS</button>
+    </div>
+  </div>
+</div>`;
+  });
+
+  el.innerHTML = html;
+}
+
+// ── HISTORIQUE ───────────────────────────────────────────────────
+function renderHistory() {
+  const el     = document.getElementById('history-wrap');
+  const closed = [...state.trades.filter(t => t.result !== null)].reverse();
+
+  if (!closed.length) {
+    el.innerHTML = `
+      <div class="empty">
+        <div class="empty-ico">📋</div>
+        <div class="empty-ttl">Aucun historique</div>
+        <div class="empty-sub">Les trades clôturés apparaissent ici.</div>
+      </div>`;
+    return;
+  }
+
+  let rows = '';
+  closed.forEach(t => {
+    const pnl    = t.pnlPct ?? 0;
+    const sign   = pnl >= 0 ? '+' : '';
+    const pClass = pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+    rows += `
+<tr>
+  <td style="white-space:nowrap;font-size:11px">${fmtDate(t.entryDate)}</td>
+  <td style="font-weight:700">${t.crypto.split('/')[0]}</td>
+  <td><span class="badge ${t.direction === 'BUY' ? 'b-buy' : 'b-sell'}" style="padding:2px 7px">${t.direction[0]}</span></td>
+  <td><span class="badge ${t.result === 'WIN' ? 'b-win' : 'b-loss'}">${t.result}</span></td>
+  <td class="${pClass}">${sign}${pnl.toFixed(2)}%</td>
+</tr>`;
+  });
+
+  el.innerHTML = `
+<div class="sec-label">${closed.length} trade(s) clôturé(s)</div>
+<div class="card">
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>Crypto</th><th>Dir</th><th>Résultat</th><th>PnL</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>
+</div>`;
+}
+
+// ── STATS ────────────────────────────────────────────────────────
+function renderStats() {
+  const el = document.getElementById('stats-wrap');
+  const st = state.stats;
+
+  if (!st || st.totalTrades === 0) {
+    el.innerHTML = `
+      <div class="empty">
+        <div class="empty-ico">📊</div>
+        <div class="empty-ttl">Pas encore de stats</div>
+        <div class="empty-sub">Stats disponibles après le premier trade clôturé.</div>
+      </div>`;
+    return;
+  }
+
+  const wrColor = st.winRate >= 60 ? 'var(--green)' : st.winRate >= 50 ? 'var(--yellow)' : 'var(--red)';
+  const pfColor = st.profitFactor >= 2 ? 'var(--green)' : st.profitFactor >= 1.5 ? 'var(--yellow)' : 'var(--red)';
+  const pnlColor = st.totalPnlPct >= 0 ? 'var(--green)' : 'var(--red)';
+  const pnlSign  = st.totalPnlPct >= 0 ? '+' : '';
+
+  let html = `
+<div class="metric-grid">
+  <div class="metric-card">
+    <div class="m-lbl">Win Rate</div>
+    <div class="m-val" style="color:${wrColor}">${st.winRate ?? '—'}%</div>
+    <div class="m-sub">${st.wins}W / ${st.losses}L</div>
+  </div>
+  <div class="metric-card">
+    <div class="m-lbl">Profit Factor</div>
+    <div class="m-val" style="color:${pfColor}">${st.profitFactor ?? '—'}</div>
+    <div class="m-sub">Cible ≥ 2.0</div>
+  </div>
+  <div class="metric-card">
+    <div class="m-lbl">PnL Total</div>
+    <div class="m-val" style="color:${pnlColor}">${pnlSign}${st.totalPnlPct}%</div>
+    <div class="m-sub">${st.totalTrades} trades</div>
+  </div>
+  <div class="metric-card">
+    <div class="m-lbl">Max Drawdown</div>
+    <div class="m-val" style="color:var(--red)">−${st.maxDrawdown ?? 0}%</div>
+    <div class="m-sub">Pire période</div>
+  </div>
+</div>`;
+
+  // Streak
+  if (st.currentStreak > 0) {
+    const sColor = st.currentStreakType === 'WIN' ? 'var(--green)' : 'var(--red)';
+    const sIco   = st.currentStreakType === 'WIN' ? '🔥' : '❄️';
+    html += `
+<div class="streak-card">
+  <div class="streak-ico">${sIco}</div>
+  <div>
+    <div class="streak-lbl">Série en cours</div>
+    <div class="streak-val" style="color:${sColor}">${st.currentStreak} ${st.currentStreakType}</div>
+  </div>
+</div>`;
+  }
+
+  // Par direction
+  html += `<div class="sec-label">Par direction</div><div class="card"><div class="card-body">`;
+  ['BUY', 'SELL'].forEach(dir => {
+    const d = st.byDirection[dir];
+    if (!d || d.trades === 0) return;
+    const wr    = d.winRate ?? 0;
+    const color = dir === 'BUY' ? 'var(--green)' : 'var(--red)';
+    html += `
+<div class="dir-row">
+  <div class="dir-hdr">
+    <span class="badge ${dir === 'BUY' ? 'b-buy' : 'b-sell'}">${dir}</span>
+    <span style="font-size:12px">${d.wins}W / ${d.losses}L · <strong style="color:${color}">${wr}%</strong></span>
+  </div>
+  <div class="prog-bar"><div class="prog-fill" style="width:${wr}%;background:${color}"></div></div>
+</div>`;
+  });
+  html += `</div></div>`;
+
+  // Par crypto
+  const cryptos = ['BTC/USD','ETH/USD','SOL/USD','BNB/USD','XRP/USD'];
+  const hasCrypto = cryptos.some(c => st.byCrypto?.[c]?.trades > 0);
+  if (hasCrypto) {
+    html += `<div class="sec-label">Par crypto</div><div class="card"><div class="card-body">`;
+    cryptos.forEach(c => {
+      const d = st.byCrypto?.[c];
+      if (!d || d.trades === 0) return;
+      const wr    = d.winRate ?? 0;
+      const color = wr >= 60 ? 'var(--green)' : wr >= 50 ? 'var(--yellow)' : 'var(--red)';
+      html += `
+<div class="crypto-row">
+  <div class="cr-name">${c.split('/')[0]}</div>
+  <div class="cr-bar">
+    <div class="prog-bar"><div class="prog-fill" style="width:${wr}%;background:${color}"></div></div>
+    <div class="cr-cnt">${d.trades} trade${d.trades > 1 ? 's' : ''}</div>
+  </div>
+  <div class="cr-wr" style="color:${color}">${wr}%</div>
+</div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // Référence backtest
+  html += `
+<div class="sec-label">Référence backtest</div>
+<div class="card">
+  <div class="card-body">
+    <table class="bt-table" style="width:100%">
+      <thead><tr><th>Dir.</th><th>WR</th><th>WF-min</th><th>WF-moy</th><th>PF</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="badge b-buy">BUY</span></td>
+          <td style="color:var(--green);font-weight:700">63%</td>
+          <td>54%</td><td>69%</td>
+          <td style="font-weight:700">2.78</td>
+        </tr>
+        <tr>
+          <td><span class="badge b-sell">SELL</span></td>
+          <td style="color:var(--green);font-weight:700">62%</td>
+          <td>38%</td><td>69%</td>
+          <td style="font-weight:700">2.72</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>`;
+
+  el.innerHTML = html;
+}
+
+// ================================================================
+// MODAL — TAKE SIGNAL
+// ================================================================
+function openSignalModal(id) {
+  const s = window._sMap[id];
+  if (!s) return;
+
+  document.getElementById('modal-sig-ttl').textContent =
+    `${s.direction} · ${s.crypto}`;
+
+  document.getElementById('modal-sig-body').innerHTML = `
+<div class="form-grp">
+  <label class="form-lbl">Prix d'entrée</label>
+  <input class="form-inp" id="si-entry" type="number" step="any" value="${s.price}">
+</div>
+<div class="form-grp">
+  <label class="form-lbl">Stop Loss (−3%)</label>
+  <input class="form-inp" id="si-sl" type="number" step="any" value="${s.sl}">
+</div>
+<div class="form-grp">
+  <label class="form-lbl">Take Profit (+5%)</label>
+  <input class="form-inp" id="si-tp" type="number" step="any" value="${s.tp}">
+</div>
+<div style="font-size:11px;color:var(--muted);margin-bottom:4px">R:R 1.67 · SL 3% · TP 5%</div>
+<div style="display:flex;gap:8px;margin-top:14px">
+  <button class="btn btn-ghost" style="margin-top:0" onclick="closeSignalModal()">Annuler</button>
+  <button class="btn btn-primary" style="margin-top:0" id="si-confirm"
+    onclick="confirmTrade('${s.id}','${s.crypto}','${s.direction}')">Confirmer</button>
+</div>`;
+
+  document.getElementById('ov-signal').classList.add('open');
+}
+
+async function confirmTrade(signalId, crypto, direction) {
+  const entryPrice = parseFloat(document.getElementById('si-entry').value);
+  const sl         = parseFloat(document.getElementById('si-sl').value);
+  const tp         = parseFloat(document.getElementById('si-tp').value);
+
+  if ([entryPrice, sl, tp].some(v => isNaN(v) || v <= 0)) {
+    showAlert('Tous les prix doivent être positifs', 'err'); return;
+  }
+
+  const btn = document.getElementById('si-confirm');
+  btn.disabled = true; btn.textContent = '...';
+
+  try {
+    const r = await fetch(`${API_BASE}/api/trade`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ crypto, direction, entryPrice, sl, tp, signalId })
+    });
+    const d = await r.json();
+    if (d.success) {
+      closeSignalModal();
+      showAlert('Trade enregistré ✓', 'ok');
+      await loadAll();
+      switchTab('trades');
+    } else {
+      showAlert(d.error || 'Erreur serveur', 'err');
+    }
+  } catch { showAlert('Erreur de connexion', 'err'); }
+  finally { btn.disabled = false; btn.textContent = 'Confirmer'; }
+}
+
+function closeSignalModal(e) {
+  if (e && e.target !== document.getElementById('ov-signal')) return;
+  document.getElementById('ov-signal').classList.remove('open');
+}
+
+// ================================================================
+// MODAL — CLOSE TRADE
+// ================================================================
+let _closeCtx = { id: null, result: null };
+
+function openTradeModal(id, sugResult, sugPrice, crypto) {
+  _closeCtx = { id, result: sugResult };
+
+  document.getElementById('modal-trd-ttl').textContent = 'Clôturer le trade';
+
+  document.getElementById('modal-trd-body').innerHTML = `
+<div class="form-grp">
+  <label class="form-lbl">Prix de sortie</label>
+  <input class="form-inp" id="td-exit" type="number" step="any" value="${sugPrice}">
+</div>
+<div class="form-grp">
+  <label class="form-lbl">Résultat</label>
+  <div style="display:flex;gap:8px;margin-top:2px">
+    <button class="btn btn-success" style="margin-top:0;flex:1" id="td-win"
+      onclick="setCloseResult('WIN')">✓ WIN</button>
+    <button class="btn btn-danger" style="margin-top:0;flex:1" id="td-loss"
+      onclick="setCloseResult('LOSS')">✗ LOSS</button>
+  </div>
+</div>
+<div id="td-selected" style="font-size:12px;color:var(--muted);margin-bottom:4px">
+  Résultat sélectionné : <strong id="td-res-lbl" style="color:${sugResult === 'WIN' ? 'var(--green)' : 'var(--red)'}">${sugResult}</strong>
+</div>
+<div style="display:flex;gap:8px;margin-top:14px">
+  <button class="btn btn-ghost" style="margin-top:0" onclick="closeTradeModal()">Annuler</button>
+  <button class="btn btn-primary" style="margin-top:0" id="td-confirm"
+    onclick="submitClose()">Confirmer</button>
+</div>`;
+
+  document.getElementById('ov-trade').classList.add('open');
+}
+
+function setCloseResult(res) {
+  _closeCtx.result = res;
+  const lbl = document.getElementById('td-res-lbl');
+  if (lbl) {
+    lbl.textContent = res;
+    lbl.style.color = res === 'WIN' ? 'var(--green)' : 'var(--red)';
+  }
+}
+
+async function submitClose() {
+  const exitPrice = parseFloat(document.getElementById('td-exit').value);
+  const { id, result } = _closeCtx;
+
+  if (isNaN(exitPrice) || exitPrice <= 0) {
+    showAlert('Prix de sortie invalide', 'err'); return;
+  }
+  if (!result) {
+    showAlert('Sélectionne WIN ou LOSS', 'err'); return;
+  }
+
+  const btn = document.getElementById('td-confirm');
+  btn.disabled = true; btn.textContent = '...';
+
+  try {
+    const r = await fetch(`${API_BASE}/api/trade/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exitPrice, result })
+    });
+    const d = await r.json();
+    if (d.success) {
+      closeTradeModal();
+      const pnl  = d.trade.pnlPct ?? 0;
+      const sign = pnl >= 0 ? '+' : '';
+      showAlert(`${result} · ${sign}${pnl.toFixed(2)}%`, result === 'WIN' ? 'ok' : 'err');
+      await loadAll();
+    } else {
+      showAlert(d.error || 'Erreur serveur', 'err');
+    }
+  } catch { showAlert('Erreur de connexion', 'err'); }
+  finally { btn.disabled = false; btn.textContent = 'Confirmer'; }
+}
+
+function closeTradeModal(e) {
+  if (e && e.target !== document.getElementById('ov-trade')) return;
+  document.getElementById('ov-trade').classList.remove('open');
+}
+
+// ================================================================
+// TABS
+// ================================================================
+function switchTab(tab) {
+  state.tab = tab;
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('nav-' + tab).classList.add('active');
+}
+
+// ================================================================
+// UTILS
+// ================================================================
+function fmtP(price, crypto) {
+  if (price == null || isNaN(price)) return '—';
+  const dec = crypto === 'XRP/USD' ? 4 : 2;
+  return '$' + price.toLocaleString('en-US', {
+    minimumFractionDigits: dec, maximumFractionDigits: dec
+  });
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  } catch { return '—'; }
+}
+
+function elapsedStr(iso) {
+  if (!iso) return '';
+  const ms   = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(ms / 86400000);
+  const hrs  = Math.floor((ms % 86400000) / 3600000);
+  return days > 0 ? `${days}j ${hrs}h` : `${hrs}h`;
+}
+
+function updateHeader() {
+  const el = document.getElementById('last-scan');
+  if (!state.lastScan) { el.textContent = 'Jamais scanné'; return; }
+  try {
+    const d = new Date(state.lastScan);
+    el.textContent = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+      + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  } catch { el.textContent = ''; }
+}
+
+function updateBadges() {
+  const active = state.trades.filter(t => t.result === null).length;
+  const el     = document.getElementById('badge-trades');
+  if (active > 0) { el.textContent = active; el.style.display = 'block'; }
+  else            { el.style.display = 'none'; }
+}
+
+let _alertTimer;
+function showAlert(msg, type = 'inf') {
+  const el = document.getElementById('alert-box');
+  el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+  clearTimeout(_alertTimer);
+  _alertTimer = setTimeout(() => { el.innerHTML = ''; }, 4000);
+}
+</script>
+
+</body>
+</html>
