@@ -1,12 +1,12 @@
 'use strict';
-
+ 
 require('dotenv').config();
 const express = require('express');
 const axios   = require('axios');
 const cron    = require('node-cron');
 const cors    = require('cors');
 const path    = require('path');
-
+ 
 // ================================================================
 // CONFIG & VALIDATION
 // ================================================================
@@ -14,10 +14,10 @@ const PORT        = process.env.PORT || 3000;
 const TWELVE_KEY  = process.env.TWELVE_DATA_KEY;
 const JSONBIN_KEY = process.env.JSONBIN_KEY;
 const BIN_ID      = process.env.JSONBIN_BIN_ID || '69f768d7856a6821899fed2a';
-
+ 
 if (!TWELVE_KEY)  { console.error('❌ MISSING ENV: TWELVE_DATA_KEY');  process.exit(1); }
 if (!JSONBIN_KEY) { console.error('❌ MISSING ENV: JSONBIN_KEY');       process.exit(1); }
-
+ 
 // ================================================================
 // CONSTANTS
 // ================================================================
@@ -25,26 +25,26 @@ const CRYPTOS  = ['BTC/USD', 'ETH/USD', 'SOL/USD', 'BNB/USD', 'XRP/USD'];
 const CANDLES  = 1000;  // candles fetched per symbol (4h × 1000 = ~166 jours)
 const SL_PCT   = 0.03;  // 3% stop-loss
 const TP_PCT   = 0.05;  // 5% take-profit
-
+ 
 // Production combos from backtest (Rang 4 BUY / Rang 22 SELL)
 const BUY_COMBO  = ['macdCrossUp', 'ema50_200Bear', 'aroonBear', 'atrHigh', 'momentumAccelBear'];
 const SELL_COMBO = ['mfiOversold', 'accDistBear', 'atrNormal', 'cciOverbought', 'higherHighs'];
-
+ 
 const BACKTEST = {
   BUY:  { wr: 63, wfMin: 54, wfMoy: 69, pf: 2.78 },
   SELL: { wr: 62, wfMin: 38, wfMoy: 69, pf: 2.72 }
 };
-
+ 
 // ================================================================
 // UTILS
 // ================================================================
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const uid   = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-
+ 
 // ================================================================
 // INDICATOR ENGINE
 // ================================================================
-
+ 
 /**
  * EMA — Exponential Moving Average
  * result[k] aligns with data[period-1+k]
@@ -61,7 +61,7 @@ function calcEMA(data, period) {
   }
   return out; // length = data.length - period + 1
 }
-
+ 
 /**
  * ATR(14) — Wilder's Average True Range
  * result[k] aligns with candle[14+k]
@@ -86,7 +86,7 @@ function calcATR(H, L, C, period) {
   }
   return out; // length = n - period
 }
-
+ 
 /**
  * MACD(12, 26, 9)
  * line[k]  aligns with candle[25+k]  (length = n-25)
@@ -98,21 +98,21 @@ function calcMACD(C) {
   const e12 = calcEMA(C, 12); // e12[k] → C[11+k]
   const e26 = calcEMA(C, 26); // e26[k] → C[25+k]
   if (!e12 || !e26) return null;
-
+ 
   // line[k] = e12[k+14] - e26[k]  →  C[25+k]
   const line = [];
   for (let k = 0; k < e26.length; k++) {
     line.push(e12[k + 14] - e26[k]);
   }
   if (line.length < 9) return null;
-
+ 
   // sig[j] = EMA9(line)[j]  →  line[8+j]  →  C[33+j]
   const sig = calcEMA(line, 9);
   if (!sig || sig.length < 2) return null;
-
+ 
   return { line, sig };
 }
-
+ 
 /**
  * Aroon(25)
  * up[k], dn[k] align with candle[25+k]
@@ -132,7 +132,7 @@ function calcAroon(H, L, period) {
   }
   return { up, dn }; // each array length = n - period
 }
-
+ 
 /**
  * MFI(14) — Money Flow Index
  * result[k] aligns with candle[14+k]
@@ -142,11 +142,11 @@ function calcMFI(H, L, C, V, period) {
   const n = C.length;
   if (n < period + 1) return null;
   if (!V.some(v => v > 0)) return null; // no volume data
-
+ 
   const tp  = C.map((c, i) => (H[i] + L[i] + c) / 3);
   const rmf = tp.map((t, i) => t * V[i]);
   const out = [];
-
+ 
   for (let i = period; i < n; i++) {
     let pos = 0, neg = 0;
     for (let j = i - period + 1; j <= i; j++) {
@@ -158,7 +158,7 @@ function calcMFI(H, L, C, V, period) {
   }
   return out; // length = n - period
 }
-
+ 
 /**
  * CCI(20) — Commodity Channel Index
  * result[k] aligns with candle[19+k]
@@ -177,7 +177,7 @@ function calcCCI(H, L, C, period) {
   }
   return out; // length = n - period + 1
 }
-
+ 
 /**
  * Accumulation / Distribution line
  * Same length as input (cumulative)
@@ -195,7 +195,7 @@ function calcAccDist(H, L, C, V) {
   }
   return out; // length = n
 }
-
+ 
 /**
  * Momentum(10) — Close[i] - Close[i-10]
  * result[k] aligns with candle[10+k]
@@ -206,7 +206,7 @@ function calcMomentum(C, period) {
   if (n < period + 1) return null;
   return C.slice(period).map((c, i) => c - C[i]); // length = n - period
 }
-
+ 
 // ================================================================
 // SIGNAL DETECTION
 // ================================================================
@@ -216,7 +216,7 @@ function detectSignals(candles) {
   const H = candles.map(c => c.high);
   const L = candles.map(c => c.low);
   const V = candles.map(c => c.volume);
-
+ 
   // Compute all indicators
   const E50  = calcEMA(C, 50);
   const E200 = calcEMA(C, 200);
@@ -227,9 +227,9 @@ function detectSignals(candles) {
   const CCI  = calcCCI(H, L, C, 20);
   const AD   = calcAccDist(H, L, C, V);
   const MOM  = calcMomentum(C, 10);
-
+ 
   const s = {};
-
+ 
   // ── BUY SIGNAL 1: macdCrossUp ─────────────────────────────────
   // MACD line crosses above signal line (bullish crossover)
   // Verified: sig[i] pairs with line[8+i] for all i
@@ -240,17 +240,17 @@ function detectSignals(candles) {
   } else {
     s.macdCrossUp = false;
   }
-
+ 
   // ── BUY SIGNAL 2: ema50_200Bear ───────────────────────────────
   // EMA50 below EMA200 = bearish trend context (death cross region)
   s.ema50_200Bear = !!(E50 && E200 &&
     E50[E50.length - 1] < E200[E200.length - 1]);
-
+ 
   // ── BUY SIGNAL 3: aroonBear ───────────────────────────────────
   // AroonDown > AroonUp = bearish momentum in Aroon
   s.aroonBear = !!(AR && AR.dn.length > 0 &&
     AR.dn[AR.dn.length - 1] > AR.up[AR.up.length - 1]);
-
+ 
   // ── BUY SIGNAL 4: atrHigh ─────────────────────────────────────
   // ATR > 1.5× its own 20-period mean = elevated volatility
   if (ATR && ATR.length >= 20) {
@@ -260,7 +260,7 @@ function detectSignals(candles) {
   } else {
     s.atrHigh = false;
   }
-
+ 
   // ── BUY SIGNAL 5: momentumAccelBear ──────────────────────────
   // Momentum declining for 3 consecutive bars
   if (MOM && MOM.length >= 3) {
@@ -269,16 +269,16 @@ function detectSignals(candles) {
   } else {
     s.momentumAccelBear = false;
   }
-
+ 
   // ── SELL SIGNAL 1: mfiOversold ────────────────────────────────
   // MFI < 20 = money exiting despite price action (distribution)
   s.mfiOversold = !!(MFI && MFI.length > 0 && MFI[MFI.length - 1] < 20);
-
+ 
   // ── SELL SIGNAL 2: accDistBear ────────────────────────────────
   // A/D line falling = net distribution
   s.accDistBear = !!(AD && AD.length >= 2 &&
     AD[AD.length - 1] < AD[AD.length - 2]);
-
+ 
   // ── SELL SIGNAL 3: atrNormal ─────────────────────────────────
   // ATR in calm range (0.5× to 1.2× mean) = low-volatility sell setup
   if (ATR && ATR.length >= 20) {
@@ -289,44 +289,44 @@ function detectSignals(candles) {
   } else {
     s.atrNormal = false;
   }
-
+ 
   // ── SELL SIGNAL 4: cciOverbought ─────────────────────────────
   // CCI > 100 = overbought momentum
   s.cciOverbought = !!(CCI && CCI.length > 0 && CCI[CCI.length - 1] > 100);
-
+ 
   // ── SELL SIGNAL 5: higherHighs ───────────────────────────────
   // 3 consecutive higher highs = extension / exhaustion
   s.higherHighs = n >= 3 &&
     H[n - 1] > H[n - 2] && H[n - 2] > H[n - 3];
-
+ 
   // ── COMBO CHECK ───────────────────────────────────────────────
   const buyOk  = BUY_COMBO.every(k => s[k] === true);
   const sellOk = SELL_COMBO.every(k => s[k] === true);
-
+ 
   return { signals: s, buyOk, sellOk };
 }
-
+ 
 // ================================================================
 // JSONBIN
 // ================================================================
 const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 const READ_HEADERS  = { 'X-Master-Key': JSONBIN_KEY };
 const WRITE_HEADERS = { 'X-Master-Key': JSONBIN_KEY, 'Content-Type': 'application/json' };
-
+ 
 async function readBin() {
   const r = await axios.get(`${BIN_URL}/latest`, {
     headers: READ_HEADERS, timeout: 12000
   });
   return r.data.record;
 }
-
+ 
 async function writeBin(data) {
   const r = await axios.put(BIN_URL, data, {
     headers: WRITE_HEADERS, timeout: 12000
   });
   return r.data.record;
 }
-
+ 
 // ================================================================
 // TWELVE DATA FETCH
 // ================================================================
@@ -344,16 +344,16 @@ async function fetchCandles(symbol) {
         },
         timeout: 20000
       });
-
+ 
       if (res.data.status === 'error') {
         throw new Error(`Twelve Data: ${res.data.message}`);
       }
-
+ 
       const vals = res.data.values;
       if (!vals || vals.length < 50) {
         throw new Error(`Not enough candles for ${symbol}: ${vals?.length}`);
       }
-
+ 
       // Twelve Data returns newest-first — reverse to chronological
       return vals.reverse().map(v => ({
         datetime: v.datetime,
@@ -363,7 +363,7 @@ async function fetchCandles(symbol) {
         close:  parseFloat(v.close),
         volume: parseFloat(v.volume) || 0
       }));
-
+ 
     } catch (e) {
       lastErr = e;
       if (attempt < 3) {
@@ -374,13 +374,13 @@ async function fetchCandles(symbol) {
   }
   throw lastErr;
 }
-
+ 
 // ================================================================
 // STATS RECALCULATION
 // ================================================================
 function recalcStats(trades) {
   const closed = trades.filter(t => t.result !== null);
-
+ 
   const st = {
     totalTrades: closed.length,
     wins: 0, losses: 0,
@@ -395,30 +395,30 @@ function recalcStats(trades) {
       CRYPTOS.map(c => [c, { trades: 0, wins: 0, losses: 0, winRate: null }])
     )
   };
-
+ 
   if (!closed.length) return st;
-
+ 
   let totalGain = 0, totalLoss = 0;
   let equity = 0, peak = 0, maxDD = 0;
-
+ 
   for (const t of closed) {
     const win = t.result === 'WIN';
     if (win) { st.wins++;   totalGain += Math.abs(t.pnlPct ?? TP_PCT * 100); }
     else     { st.losses++; totalLoss += Math.abs(t.pnlPct ?? SL_PCT * 100); }
-
+ 
     st.totalPnlPct += (t.pnlPct ?? 0);
     equity += (t.pnlPct ?? 0);
     if (equity > peak) peak = equity;
     const dd = peak - equity;
     if (dd > maxDD) maxDD = dd;
-
+ 
     // By direction
     if (st.byDirection[t.direction]) {
       st.byDirection[t.direction].trades++;
       if (win) st.byDirection[t.direction].wins++;
       else     st.byDirection[t.direction].losses++;
     }
-
+ 
     // By crypto
     if (st.byCrypto[t.crypto]) {
       st.byCrypto[t.crypto].trades++;
@@ -426,12 +426,12 @@ function recalcStats(trades) {
       else     st.byCrypto[t.crypto].losses++;
     }
   }
-
+ 
   st.winRate       = Math.round(st.wins / closed.length * 100);
   st.profitFactor  = totalLoss > 0 ? parseFloat((totalGain / totalLoss).toFixed(2)) : null;
   st.maxDrawdown   = parseFloat(maxDD.toFixed(2));
   st.totalPnlPct   = parseFloat(st.totalPnlPct.toFixed(2));
-
+ 
   for (const d of ['BUY', 'SELL']) {
     const x = st.byDirection[d];
     x.winRate = x.trades > 0 ? Math.round(x.wins / x.trades * 100) : null;
@@ -440,7 +440,7 @@ function recalcStats(trades) {
     const x = st.byCrypto[c];
     x.winRate = x.trades > 0 ? Math.round(x.wins / x.trades * 100) : null;
   }
-
+ 
   // Current streak
   if (closed.length > 0) {
     const lastResult = closed[closed.length - 1].result;
@@ -449,15 +449,44 @@ function recalcStats(trades) {
     st.currentStreak     = streak;
     st.currentStreakType = lastResult;
   }
-
+ 
   return st;
 }
-
+ 
+// ================================================================
+// FETCH BOUGIES 30MIN (vérification TP/SL)
+// ================================================================
+async function fetchCandles30(symbol) {
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await axios.get('https://api.twelvedata.com/time_series', {
+        params: {
+          symbol,
+          interval:   '15min',
+          outputsize: 300,
+          apikey:     TWELVE_KEY,
+          format:     'JSON'
+        },
+        timeout: 20000
+      });
+      if (res.data.status === 'error') throw new Error(`Twelve Data: ${res.data.message}`);
+      const vals = res.data.values;
+      if (!vals || vals.length < 2) throw new Error(`Not enough 15min candles for ${symbol}`);
+      return vals.reverse().slice(0, -1); // chronologique, retire bougie en cours
+    } catch (e) {
+      lastErr = e;
+      if (attempt < 3) await sleep(10000);
+    }
+  }
+  throw lastErr;
+}
+ 
 // ================================================================
 // MAIN SCAN
 // ================================================================
 let scanRunning = false;
-
+ 
 async function runScan() {
   if (scanRunning) {
     console.log('⚠️  Scan already running — skipped');
@@ -466,17 +495,17 @@ async function runScan() {
   scanRunning = true;
   const scanTime = new Date().toISOString();
   console.log(`\n📡 Scan started — ${scanTime}`);
-
+ 
   const newSignals = [];
   const errors     = [];
-
+ 
   for (const crypto of CRYPTOS) {
     try {
       console.log(`  → ${crypto}`);
       const candles = await fetchCandles(crypto);
       const { signals, buyOk, sellOk } = detectSignals(candles);
       const price = candles[candles.length - 1].close;
-
+ 
       if (buyOk) {
         newSignals.push({
           id:          uid(),
@@ -492,7 +521,7 @@ async function runScan() {
         });
         console.log(`     ✅ BUY signal!`);
       }
-
+ 
       if (sellOk) {
         newSignals.push({
           id:          uid(),
@@ -508,91 +537,85 @@ async function runScan() {
         });
         console.log(`     ✅ SELL signal!`);
       }
-
+ 
       if (!buyOk && !sellOk) console.log(`     ○  No signal`);
-
+ 
       await sleep(13000); // 13s entre paires → jamais > 8 req/min sur Twelve Data
     } catch (e) {
       console.error(`     ❌ ${crypto}: ${e.message}`);
       errors.push({ crypto, error: e.message });
     }
   }
-
+ 
   // Persist signals + check TP/SL des trades actifs
   try {
     const data    = await readBin();
     data.lastScan = scanTime;
     data.signals  = newSignals;
-
+ 
     // Vérification TP/SL par high/low des bougies pour chaque trade actif
-    const activeTrades = (data.trades || []).filter(t => t.result === null);
-    if (activeTrades.length) {
-      console.log(`\n🔍 Vérification TP/SL — ${activeTrades.length} trade(s) actif(s)`);
+    // Vérification TP/SL — bougies 15min, filtre strict post-entrée
+    const activeTrades30 = (data.trades || []).filter(t => t.result === null);
+    if (activeTrades30.length) {
+      console.log(`\n🔍 Vérification TP/SL 15min — ${activeTrades30.length} trade(s) actif(s)`);
       let tradesChanged = false;
-
-      for (const trade of activeTrades) {
+ 
+      for (const trade of activeTrades30) {
         try {
-          const tp        = parseFloat(trade.tp);
-          const sl        = parseFloat(trade.sl);
-          const en        = parseFloat(trade.entryPrice);
-          const entryDate = new Date(trade.entryDate || trade.entryPrice);
-
-          // Réutiliser les bougies déjà récupérées si possible
-          const candles = await fetchCandles(trade.crypto);
+          const tp    = parseFloat(trade.tp);
+          const sl    = parseFloat(trade.sl);
+          const en    = parseFloat(trade.entryPrice);
+          const entryTs = new Date(trade.entryDate).getTime();
+ 
+          if (isNaN(entryTs)) {
+            console.log(`  ⚠️  ${trade.crypto} — date d'entrée invalide`);
+            continue;
+          }
+ 
+          // Fetch bougies 15min
+          const candles30 = await fetchCandles30(trade.crypto);
           await sleep(13000);
-
-          if (!candles || !candles.length) {
-            console.log(`  ⚠️  ${trade.crypto} — bougies indisponibles`);
+ 
+          if (!candles30 || !candles30.length) {
+            console.log(`  ⚠️  ${trade.crypto} — bougies 15min indisponibles`);
             continue;
           }
-
-          // Filtrer les bougies après l'entrée du trade
-          const candlesAfterEntry = candles.filter(
-            c => new Date(c.datetime) >= new Date(trade.entryDate)
-          );
-
-          if (!candlesAfterEntry.length) {
-            console.log(`  ⏸  ${trade.crypto} — aucune bougie après l'entrée`);
+ 
+          // Filtre strict : uniquement bougies dont le DÉBUT est APRÈS l'entrée
+          const postEntry = candles30.filter(c => new Date(c.datetime).getTime() > entryTs);
+ 
+          if (!postEntry.length) {
+            const last = candles30[candles30.length - 1];
+            const distTP = Math.abs(last.close - tp) / last.close * 100;
+            const distSL = Math.abs(last.close - sl) / last.close * 100;
+            console.log(`  ⏸  ${trade.crypto} — en attente bougie 15min post-entrée | TP: ${distTP.toFixed(2)}% | SL: ${distSL.toFixed(2)}%`);
             continue;
           }
-
+ 
           let closed = false, result = null, closePrice = null, closeDate = null;
-
-          for (const candle of candlesAfterEntry) {
-            const high = candle.high;
-            const low  = candle.low;
-
+ 
+          for (const candle of postEntry) {
+            const high = parseFloat(candle.high);
+            const low  = parseFloat(candle.low);
+ 
             if (trade.direction === 'BUY') {
-              if (high >= tp) {
-                closed = true; result = 'WIN'; closePrice = tp;
-                closeDate = candle.datetime; break;
-              }
-              if (low <= sl) {
-                closed = true; result = 'LOSS'; closePrice = sl;
-                closeDate = candle.datetime; break;
-              }
-            } else { // SELL
-              if (low <= tp) {
-                closed = true; result = 'WIN'; closePrice = tp;
-                closeDate = candle.datetime; break;
-              }
-              if (high >= sl) {
-                closed = true; result = 'LOSS'; closePrice = sl;
-                closeDate = candle.datetime; break;
-              }
+              if (high >= tp) { closed=true; result='WIN';  closePrice=tp; closeDate=candle.datetime; break; }
+              if (low  <= sl) { closed=true; result='LOSS'; closePrice=sl; closeDate=candle.datetime; break; }
+            } else {
+              if (low  <= tp) { closed=true; result='WIN';  closePrice=tp; closeDate=candle.datetime; break; }
+              if (high >= sl) { closed=true; result='LOSS'; closePrice=sl; closeDate=candle.datetime; break; }
             }
           }
-
+ 
           if (closed) {
             const pnlPct = parseFloat((
               trade.direction === 'BUY'
                 ? (closePrice - en) / en * 100
                 : (en - closePrice) / en * 100
             ).toFixed(2));
-
-            console.log(`  ${result === 'WIN' ? '✅' : '❌'} ${trade.crypto} ${trade.direction} — ${pnlPct > 0 ? '+' : ''}${pnlPct}% | bougie: ${closeDate}`);
-
-            // Mettre à jour le trade dans data.trades
+ 
+            console.log(`  ${result==='WIN'?'✅':'❌'} ${trade.crypto} ${trade.direction} — ${pnlPct>0?'+':''}${pnlPct}% | 15min: ${closeDate}`);
+ 
             const tradeIdx = data.trades.findIndex(t => t.id === trade.id);
             if (tradeIdx !== -1) {
               data.trades[tradeIdx].exitPrice = closePrice;
@@ -600,42 +623,41 @@ async function runScan() {
               data.trades[tradeIdx].result    = result;
               data.trades[tradeIdx].pnlPct    = pnlPct;
             }
-
-            // Marquer le signal correspondant comme terminé
+ 
             if (trade.signalId && data.signals) {
               const sig = data.signals.find(s => s.id === trade.signalId);
               if (sig) sig.status = 'closed';
             }
-
+ 
             tradesChanged = true;
           } else {
-            const last   = candlesAfterEntry[candlesAfterEntry.length - 1];
+            const last   = postEntry[postEntry.length - 1];
             const distTP = Math.abs(last.close - tp) / last.close * 100;
             const distSL = Math.abs(last.close - sl) / last.close * 100;
-            console.log(`  ⏸  ${trade.crypto} ${trade.direction} | ${last.close} | TP à ${distTP.toFixed(2)}% | SL à ${distSL.toFixed(2)}% | ${candlesAfterEntry.length} bougies`);
+            console.log(`  ⏸  ${trade.crypto} ${trade.direction} | ${last.close} | TP ${distTP.toFixed(2)}% | SL ${distSL.toFixed(2)}% | ${postEntry.length} bougies 15min`);
           }
-
+ 
         } catch (e) {
           console.error(`  ❌ checkTrades ${trade.crypto}: ${e.message}`);
         }
       }
-
+ 
       if (tradesChanged) {
         data.stats = recalcStats(data.trades);
       }
     }
-
+ 
     await writeBin(data);
     console.log(`✅ Scan done — ${newSignals.length} signal(s), ${errors.length} error(s)\n`);
   } catch (e) {
     console.error(`❌ JSONBin write failed: ${e.message}`);
     errors.push({ crypto: 'JSONBin', error: e.message });
   }
-
+ 
   scanRunning = false;
   return { signals: newSignals, errors, scanTime };
 }
-
+ 
 // ================================================================
 // EXPRESS APP
 // ================================================================
@@ -659,12 +681,12 @@ app.get('/', (_, res) => {
     }
   });
 });
-
+ 
 // ── Health check ─────────────────────────────────────────────────
 app.get('/health', (_, res) => {
   res.json({ ok: true, time: new Date().toISOString(), scanning: scanRunning });
 });
-
+ 
 // ── Manual scan ──────────────────────────────────────────────────
 app.get('/api/scan', async (req, res) => {
   try {
@@ -674,7 +696,7 @@ app.get('/api/scan', async (req, res) => {
     res.status(500).json({ success: false, error: e.message });
   }
 });
-
+ 
 // ── Last scan signals ─────────────────────────────────────────────
 app.get('/api/signals', async (_, res) => {
   try {
@@ -684,7 +706,7 @@ app.get('/api/signals', async (_, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-
+ 
 // ── All trades ───────────────────────────────────────────────────
 app.get('/api/trades', async (_, res) => {
   try {
@@ -694,11 +716,11 @@ app.get('/api/trades', async (_, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-
+ 
 // ── Open a trade ─────────────────────────────────────────────────
 app.post('/api/trade', async (req, res) => {
   const { crypto, direction, entryPrice, sl, tp, signalId } = req.body;
-
+ 
   // Validation
   if (!crypto || !direction || entryPrice == null || sl == null || tp == null)
     return res.status(400).json({ error: 'Required fields: crypto, direction, entryPrice, sl, tp' });
@@ -712,7 +734,7 @@ app.post('/api/trade', async (req, res) => {
     return res.status(400).json({ error: 'sl must be a positive number' });
   if (isNaN(parseFloat(tp)) || parseFloat(tp) <= 0)
     return res.status(400).json({ error: 'tp must be a positive number' });
-
+ 
   try {
     const data  = await readBin();
     const trade = {
@@ -729,11 +751,11 @@ app.post('/api/trade', async (req, res) => {
       result:     null,
       pnlPct:     null
     };
-
+ 
     // Mark corresponding signal as taken
     const sig = (data.signals || []).find(s => s.id === signalId);
     if (sig) sig.status = 'taken';
-
+ 
     data.trades.push(trade);
     data.stats = recalcStats(data.trades);
     await writeBin(data);
@@ -742,11 +764,11 @@ app.post('/api/trade', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-
+ 
 // ── Close a trade ─────────────────────────────────────────────────
 app.put('/api/trade/:id', async (req, res) => {
   const { exitPrice, result } = req.body;
-
+ 
   // Validation
   if (exitPrice == null || !result)
     return res.status(400).json({ error: 'Required fields: exitPrice, result' });
@@ -754,18 +776,18 @@ app.put('/api/trade/:id', async (req, res) => {
     return res.status(400).json({ error: 'result must be WIN or LOSS' });
   if (isNaN(parseFloat(exitPrice)) || parseFloat(exitPrice) <= 0)
     return res.status(400).json({ error: 'exitPrice must be a positive number' });
-
+ 
   try {
     const data  = await readBin();
     const trade = (data.trades || []).find(t => t.id === req.params.id);
-
+ 
     if (!trade) return res.status(404).json({ error: 'Trade not found' });
     if (trade.result !== null) return res.status(400).json({ error: 'Trade already closed' });
-
+ 
     trade.exitPrice = parseFloat(exitPrice);
     trade.exitDate  = new Date().toISOString();
     trade.result    = result;
-
+ 
     // PnL% = signed return relative to direction
     const ep = trade.entryPrice, xp = trade.exitPrice;
     trade.pnlPct = parseFloat((
@@ -773,7 +795,7 @@ app.put('/api/trade/:id', async (req, res) => {
         ? (xp - ep) / ep * 100
         : (ep - xp) / ep * 100
     ).toFixed(2));
-
+ 
     data.stats = recalcStats(data.trades);
     await writeBin(data);
     res.json({ success: true, trade });
@@ -781,7 +803,7 @@ app.put('/api/trade/:id', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-
+ 
 // ── Stats ────────────────────────────────────────────────────────
 app.get('/api/stats', async (_, res) => {
   try {
@@ -791,7 +813,7 @@ app.get('/api/stats', async (_, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-
+ 
 // ================================================================
 // CRON — 08:00 Paris time every day
 // ================================================================
@@ -799,7 +821,7 @@ cron.schedule('5 */4 * * *', () => {
   console.log('⏰ Cron triggered — scan toutes les 4h05');
   runScan().catch(e => console.error('Cron scan error:', e.message));
 }, { scheduled: true, timezone: 'Europe/Paris' });
-
+ 
 // ================================================================
 // START
 // ================================================================
@@ -810,3 +832,4 @@ app.listen(PORT, () => {
   console.log(`   SL / TP  : ${SL_PCT * 100}% / ${TP_PCT * 100}%`);
   console.log(`   Cron     : toutes les 4h05 (Europe/Paris)\n`);
 });
+ 
